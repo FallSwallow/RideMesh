@@ -4,7 +4,7 @@
 
 ## 下載與文件
 
-- [Android 測試版 APK](artifacts/RideMesh-Android-debug.apk)
+- [Android 0.5 測試版 APK](artifacts/RideMesh-Android-v0.5-debug.apk)
 - [原始碼壓縮包](artifacts/RideMesh-prototype.zip)
 - [機車車隊離線語音對講 App 企畫書](docs/機車車隊離線語音對講App企畫書.md)
 
@@ -27,7 +27,9 @@ Android 0.5 APK SHA-256：`345C673489FD5DB3936F7BC70C3FA1B9C404E22F0CFA9FF200D2F
 
 在 Android Studio 開啟 `android/`。需要 Android SDK 35、JDK 17 與 Gradle 8.9；此原始碼包未附 Gradle wrapper，若 Android Studio 要求 wrapper，請在已安裝 Gradle 8.9 的開發機於 `android/` 執行 `gradle wrapper --gradle-version 8.9`。同步後於具 Google Play 服務的實機執行。此原型設定 `minSdk 31`、`compileSdk 35`，Nearby 與內建 QR 掃描函式庫版本見 `android/app/build.gradle.kts`。按「建立群組」或輸入另一人的金鑰後按「開始」。啟動時需准許麥克風與鄰近裝置權限；掃描 QR Code 時需准許相機權限。
 
-本次另提供 `RideMesh-Android-debug.apk`，可傳送到 Android 12 以上且有 Google Play 服務的手機，點選 APK 安裝。若系統要求，請允許該檔案來源安裝應用程式。這是測試用 debug 簽章；同一 APK 可裝在車隊的 Android 手機，未來若改用另一把簽章金鑰，更新前須先移除這個測試版。首次啟動時請在停車狀態下授予所需權限。
+本次另提供 `RideMesh-Android-v0.5-debug.apk`，可傳送到 Android 12 以上且有 Google Play 服務的手機，點選 APK 安裝。若系統要求，請允許該檔案來源安裝應用程式。這是測試用 debug 簽章；同一 APK 可裝在車隊的 Android 手機，未來若改用另一把簽章金鑰，更新前須先移除這個測試版。首次啟動時請在停車狀態下授予所需權限。
+
+往後 Android 版本更新並建置完成後，可在專案根目錄執行 `powershell -File scripts/package-android.ps1`。腳本從 Gradle 的 `output-metadata.json` 讀取實際 APK 版號，並與 `versionName` 核對，再輸出 `artifacts/RideMesh-Android-v<版號>-debug.apk`。若 APK 建置在其他目錄，請加上 `-BuildOutputDirectory` 指定該目錄。發佈時同步更新上方下載連結與 SHA-256。
 
 ### iOS
 
