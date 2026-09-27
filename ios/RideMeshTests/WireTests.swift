@@ -19,19 +19,30 @@ final class WireTests: XCTestCase {
         let packet = try Wire.encodeAudio(key, origin: origin, sequence: 0x01020304, ttl: 4, audio: audio)
         XCTAssertEqual(packet.count, 195)
         XCTAssertEqual(Data(SHA256.hash(data: packet)).hex,
-                       "27EB906E0B6203FED9EF4B9C4CB25FDE6012167F3FCDB6A699FD15D95645513E")
+                       "53706664D2B481B499869D35C0DC94A787F13D78EA4BDDE1F0629FAAF4492E09")
         XCTAssertEqual(Wire.decodeAudio(key, data: packet)?.audio, audio)
         XCTAssertEqual(Wire.decodeAudio(key, data: Wire.lowerTTL(packet))?.ttl, 3)
+        var oldAudio = Array(packet)
+        oldAudio[2] = 1
+        XCTAssertNil(Wire.decodeAudio(key, data: Data(oldAudio)))
         var tampered = Array(packet)
         tampered[25] ^= 1
         XCTAssertNil(Wire.decodeAudio(key, data: Data(tampered)))
+        XCTAssertEqual(Wire.proof(key, code: "1234").hex,
+                       "524D020134D03C0C27359CC3038986F56964989E8666518A99C4E89B1217E5C463315D7F")
         XCTAssertTrue(Wire.validProof(Wire.proof(key, code: "1234"), key: key, code: "1234"))
         XCTAssertFalse(Wire.validProof(Wire.proof(key, code: "1234"), key: key, code: "5678"))
+        var oldProof = Array(Wire.proof(key, code: "1234"))
+        oldProof[2] = 1
+        XCTAssertFalse(Wire.validProof(Data(oldProof), key: key, code: "1234"))
         let presenceKey = Wire.presenceKey(group)
         let presence = try Wire.encodePresence(presenceKey, origin: origin, sequence: 7,
                                                ttl: 4, name: "騎士甲")
         XCTAssertEqual(Wire.decodePresence(presenceKey, data: presence)?.name, "騎士甲")
         XCTAssertEqual(Wire.decodePresence(presenceKey, data: Wire.lowerTTL(presence))?.ttl, 3)
+        var oldPresence = Array(presence)
+        oldPresence[2] = 1
+        XCTAssertNil(Wire.decodePresence(presenceKey, data: Data(oldPresence)))
         var badPresence = Array(presence)
         badPresence[25] ^= 1
         XCTAssertNil(Wire.decodePresence(presenceKey, data: Data(badPresence)))

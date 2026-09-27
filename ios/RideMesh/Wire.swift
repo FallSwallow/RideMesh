@@ -21,6 +21,7 @@ struct PresencePacket {
 
 enum Wire {
     static let serviceID = "com.example.ridemesh"
+    static let protocolVersion: UInt8 = 2
     static let maxTTL: UInt8 = 4
 
     static func randomBytes(_ count: Int) -> Data {
@@ -47,11 +48,11 @@ enum Wire {
     }
 
     static func mediaKey(_ groupKey: Data) -> SymmetricKey {
-        SymmetricKey(data: Data(SHA256.hash(data: groupKey + Data("RideMesh-media-v1".utf8))))
+        SymmetricKey(data: Data(SHA256.hash(data: groupKey + Data("RideMesh-media-v2".utf8))))
     }
 
     static func presenceKey(_ groupKey: Data) -> SymmetricKey {
-        SymmetricKey(data: Data(SHA256.hash(data: groupKey + Data("RideMesh-presence-v1".utf8))))
+        SymmetricKey(data: Data(SHA256.hash(data: groupKey + Data("RideMesh-presence-v2".utf8))))
     }
 
     static func normalizedName(_ input: String) -> String? {
@@ -68,14 +69,14 @@ enum Wire {
     }
 
     static func proof(_ key: SymmetricKey, code: String) -> Data {
-        let input = Data("RideMesh-link-v1:\(code)".utf8)
+        let input = Data("RideMesh-link-v2:\(code)".utf8)
         let mac = Data(HMAC<SHA256>.authenticationCode(for: input, using: key))
-        return Data([0x52, 0x4d, 1, 1]) + mac
+        return Data([0x52, 0x4d, protocolVersion, 1]) + mac
     }
 
     static func isProof(_ data: Data) -> Bool {
         let bytes = Array(data)
-        return bytes.count == 36 && bytes[0...3].elementsEqual([0x52, 0x4d, 1, 1])
+        return bytes.count == 36 && bytes[0...3].elementsEqual([0x52, 0x4d, protocolVersion, 1])
     }
 
     static func validProof(_ data: Data, key: SymmetricKey, code: String) -> Bool {
@@ -90,10 +91,10 @@ enum Wire {
     static func encodeAudio(_ key: SymmetricKey, origin: Data, sequence: UInt32,
                             ttl: UInt8, audio: Data) throws -> Data {
         precondition(origin.count == 8 && ttl <= maxTTL && audio.count == 160)
-        var aad = Data([0x52, 0x4d, 1, 2]) + origin
+        var aad = Data([0x52, 0x4d, protocolVersion, 2]) + origin
         aad.append(contentsOf: sequence.bigEndianBytes)
-        let nonce = try AES.GCM.Nonce(data: origin + Data(sequence.bigEndianBytes))
-        let box = try AES.GCM.seal(audio, using: key, nonce: nonce, authenticating: aad)
+        let nonce = try ChaChaPoly.Nonce(data: origin + Data(sequence.bigEndianBytes))
+        let box = try ChaChaPoly.seal(audio, using: key, nonce: nonce, authenticating: aad)
         let ciphertext = box.ciphertext + box.tag
         var packet = aad
         packet.append(ttl)
@@ -105,18 +106,18 @@ enum Wire {
 
     static func decodeAudio(_ key: SymmetricKey, data: Data) -> AudioPacket? {
         let bytes = Array(data)
-        guard bytes.count == 195, bytes[0...3].elementsEqual([0x52, 0x4d, 1, 2]),
+        guard bytes.count == 195, bytes[0...3].elementsEqual([0x52, 0x4d, protocolVersion, 2]),
               bytes[16] <= maxTTL,
               ((Int(bytes[17]) << 8) | Int(bytes[18])) == 176 else { return nil }
         let origin = Data(bytes[4..<12])
         let sequence = UInt32(bytes[12]) << 24 | UInt32(bytes[13]) << 16 |
             UInt32(bytes[14]) << 8 | UInt32(bytes[15])
         do {
-            let nonce = try AES.GCM.Nonce(data: origin + Data(sequence.bigEndianBytes))
-            let box = try AES.GCM.SealedBox(nonce: nonce,
+            let nonce = try ChaChaPoly.Nonce(data: origin + Data(sequence.bigEndianBytes))
+            let box = try ChaChaPoly.SealedBox(nonce: nonce,
                                            ciphertext: Data(bytes[19..<179]),
                                            tag: Data(bytes[179..<195]))
-            let audio = try AES.GCM.open(box, using: key, authenticating: Data(bytes[0..<16]))
+            let audio = try ChaChaPoly.open(box, using: key, authenticating: Data(bytes[0..<16]))
             return AudioPacket(origin: origin, sequence: sequence, ttl: bytes[16], audio: audio, raw: data)
         } catch { return nil }
     }
@@ -129,16 +130,16 @@ enum Wire {
 
     static func isPresence(_ data: Data) -> Bool {
         let bytes = Array(data)
-        return bytes.count >= 4 && bytes[0...3].elementsEqual([0x52, 0x4d, 1, 3])
+        return bytes.count >= 4 && bytes[0...3].elementsEqual([0x52, 0x4d, protocolVersion, 3])
     }
 
     static func encodePresence(_ key: SymmetricKey, origin: Data, sequence: UInt32,
                                ttl: UInt8, name: String) throws -> Data {
         precondition(origin.count == 8 && ttl <= maxTTL && normalizedName(name) == name)
-        var aad = Data([0x52, 0x4d, 1, 3]) + origin
+        var aad = Data([0x52, 0x4d, protocolVersion, 3]) + origin
         aad.append(contentsOf: sequence.bigEndianBytes)
-        let nonce = try AES.GCM.Nonce(data: origin + Data(sequence.bigEndianBytes))
-        let box = try AES.GCM.seal(Data(name.utf8), using: key, nonce: nonce, authenticating: aad)
+        let nonce = try ChaChaPoly.Nonce(data: origin + Data(sequence.bigEndianBytes))
+        let box = try ChaChaPoly.seal(Data(name.utf8), using: key, nonce: nonce, authenticating: aad)
         let ciphertext = box.ciphertext + box.tag
         var packet = aad
         packet.append(ttl)
@@ -158,11 +159,11 @@ enum Wire {
         let sequence = UInt32(bytes[12]) << 24 | UInt32(bytes[13]) << 16 |
             UInt32(bytes[14]) << 8 | UInt32(bytes[15])
         do {
-            let nonce = try AES.GCM.Nonce(data: origin + Data(sequence.bigEndianBytes))
-            let box = try AES.GCM.SealedBox(nonce: nonce,
+            let nonce = try ChaChaPoly.Nonce(data: origin + Data(sequence.bigEndianBytes))
+            let box = try ChaChaPoly.SealedBox(nonce: nonce,
                                            ciphertext: Data(bytes[19..<(bytes.count - 16)]),
                                            tag: Data(bytes[(bytes.count - 16)..<bytes.count]))
-            let plaintext = try AES.GCM.open(box, using: key, authenticating: Data(bytes[0..<16]))
+            let plaintext = try ChaChaPoly.open(box, using: key, authenticating: Data(bytes[0..<16]))
             guard let name = String(data: plaintext, encoding: .utf8), normalizedName(name) == name else { return nil }
             return PresencePacket(origin: origin, sequence: sequence, ttl: bytes[16], name: name)
         } catch { return nil }

@@ -43,16 +43,23 @@ class WireAndMeshTest {
         val packet = Wire.encodeAudio(mediaKey, origin, 0x01020304, 4, silence)
         assertEquals(195, packet.size)
         assertEquals(
-            "27EB906E0B6203FED9EF4B9C4CB25FDE6012167F3FCDB6A699FD15D95645513E",
+            "53706664D2B481B499869D35C0DC94A787F13D78EA4BDDE1F0629FAAF4492E09",
             MessageDigest.getInstance("SHA-256").digest(packet).toHex()
         )
         assertTrue(Wire.decodeAudio(mediaKey, packet)!!.audio.contentEquals(silence))
+        assertEquals(2, packet[2].toInt())
         assertEquals(3, Wire.decodeAudio(mediaKey, Wire.withLowerTtl(packet))!!.ttl)
+        assertNull(Wire.decodeAudio(mediaKey, packet.copyOf().also { it[2] = 1 }))
         assertNull(Wire.decodeAudio(mediaKey, packet.copyOf().also { it[25] = (it[25].toInt() xor 1).toByte() }))
+        val proof = Wire.proof(mediaKey, "1234")
+        assertEquals("524D020134D03C0C27359CC3038986F56964989E8666518A99C4E89B1217E5C463315D7F", proof.toHex())
+        assertTrue(Wire.validProof(proof, mediaKey, "1234"))
+        assertTrue(!Wire.validProof(proof.copyOf().also { it[2] = 1 }, mediaKey, "1234"))
         val presenceKey = Wire.presenceKey(group)
         val presence = Wire.encodePresence(presenceKey, origin, 7, 4, "騎士甲")
         assertEquals("騎士甲", Wire.decodePresence(presenceKey, presence)?.name)
         assertEquals(3, Wire.decodePresence(presenceKey, Wire.withLowerTtl(presence))?.ttl)
+        assertNull(Wire.decodePresence(presenceKey, presence.copyOf().also { it[2] = 1 }))
         assertNull(Wire.decodePresence(presenceKey, presence.copyOf().also { it[25] = (it[25].toInt() xor 1).toByte() }))
     }
 

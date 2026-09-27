@@ -24,7 +24,8 @@ internal class NearbyMesh(
 ) {
     private val client = Nearby.getConnectionsClient(context)
     private val handler = Handler(Looper.getMainLooper())
-    private val localName = "${router.roomId}|A${router.nodeId.toHex()}"
+    private val localIdentity = "A${router.nodeId.toHex()}"
+    private val localName = "${router.roomId}|${Wire.PROTOCOL_VERSION}|$localIdentity"
     private val authCodes = mutableMapOf<String, String>()
     private val connecting = mutableSetOf<String>()
     private val connected = mutableSetOf<String>()
@@ -40,7 +41,7 @@ internal class NearbyMesh(
     private val lifecycle = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, info: ConnectionInfo) {
             val name = info.endpointName
-            if (!sameRoom(name) || connected.size >= 4) {
+            if (peerIdentity(name) == null || connected.size >= 4) {
                 client.rejectConnection(endpointId)
                 return
             }
@@ -76,9 +77,8 @@ internal class NearbyMesh(
     private val discovery = object : EndpointDiscoveryCallback() {
         override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
             val peerName = info.endpointName
-            val peerIdentity = peerName.substringAfter('|', "")
-            if (!sameRoom(peerName)) return
-            if (peerIdentity.startsWith('I') || localName.substringAfter('|') >= peerIdentity) return
+            val peerIdentity = peerIdentity(peerName) ?: return
+            if (peerIdentity.startsWith('I') || localIdentity >= peerIdentity) return
             if (endpointId in connected || !connecting.add(endpointId) || connected.size >= 4) return
             client.requestConnection(localName, endpointId, lifecycle)
                 .addOnFailureListener { connecting.remove(endpointId) }
@@ -125,9 +125,10 @@ internal class NearbyMesh(
         authCodes.clear()
     }
 
-    private fun sameRoom(name: String): Boolean {
-        val identity = name.substringAfter('|', "")
-        return name.substringBefore('|') == router.roomId &&
-            identity.matches(Regex("[AI][0-9A-F]{16}"))
+    private fun peerIdentity(name: String): String? {
+        val parts = name.split('|')
+        if (parts.size != 3 || parts[0] != router.roomId ||
+            parts[1] != Wire.PROTOCOL_VERSION.toString()) return null
+        return parts[2].takeIf { it.matches(Regex("[AI][0-9A-F]{16}")) }
     }
 }

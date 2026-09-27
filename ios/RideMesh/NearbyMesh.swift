@@ -21,7 +21,7 @@ final class NearbyMesh: NSObject {
         self.router = router
         self.onStatus = onStatus
         self.localIdentity = "I" + router.nodeID.hex
-        self.localContext = Data("\(router.roomID)|\(localIdentity)".utf8)
+        self.localContext = Data("\(router.roomID)|\(Wire.protocolVersion)|\(localIdentity)".utf8)
         self.manager = ConnectionManager(serviceID: Wire.serviceID, strategy: .cluster)
         self.advertiser = Advertiser(connectionManager: manager)
         self.discoverer = Discoverer(connectionManager: manager)
@@ -76,8 +76,9 @@ final class NearbyMesh: NSObject {
     private func peerIdentity(_ context: Data) -> String? {
         guard let name = String(data: context, encoding: .utf8) else { return nil }
         let parts = name.split(separator: "|", omittingEmptySubsequences: false)
-        guard parts.count == 2, String(parts[0]) == router.roomID else { return nil }
-        let identity = String(parts[1])
+        guard parts.count == 3, String(parts[0]) == router.roomID,
+              String(parts[1]) == String(Wire.protocolVersion) else { return nil }
+        let identity = String(parts[2])
         guard identity.count == 17, (identity.first == "A" || identity.first == "I"),
               identity.dropFirst().allSatisfy({ $0.isHexDigit }) else { return nil }
         return identity
