@@ -22,6 +22,7 @@ struct PresencePacket {
 enum Wire {
     static let serviceID = "com.example.ridemesh"
     static let protocolVersion: UInt8 = 2
+    static let cipherName = "ChaCha20-Poly1305"
     static let maxTTL: UInt8 = 4
 
     static func randomBytes(_ count: Int) -> Data {

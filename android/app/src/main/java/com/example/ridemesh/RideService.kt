@@ -28,6 +28,8 @@ class RideService : Service() {
         private set
     @Volatile var members: List<ChannelMember> = emptyList()
         private set
+    @Volatile var isMuted = false
+        private set
     private var router: MeshRouter? = null
     private var nearby: NearbyMesh? = null
     private var audio: AudioEngine? = null
@@ -94,6 +96,7 @@ class RideService : Service() {
 
     fun setMuted(value: Boolean) {
         audio?.muted = value
+        if (audio != null) isMuted = value
     }
 
     private fun notification(): Notification {
@@ -124,6 +127,7 @@ class RideService : Service() {
         router = null
         directPeers = 0
         members = emptyList()
+        isMuted = false
         stateText = "通話已結束"
         current = null
         super.onDestroy()

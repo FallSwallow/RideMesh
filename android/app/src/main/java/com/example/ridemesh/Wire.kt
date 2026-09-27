@@ -31,6 +31,7 @@ internal data class PresencePacket(
 internal object Wire {
     const val SERVICE_ID = "com.example.ridemesh"
     const val PROTOCOL_VERSION = 2
+    const val CIPHER_NAME = "ChaCha20-Poly1305"
     const val MAX_TTL = 4
     private const val HEADER_SIZE = 19
     private val random = SecureRandom()
@@ -79,7 +80,7 @@ internal object Wire {
         val aad = ByteBuffer.allocate(16).order(ByteOrder.BIG_ENDIAN)
             .put('R'.code.toByte()).put('M'.code.toByte()).put(PROTOCOL_VERSION.toByte()).put(2)
             .put(origin).putInt(sequence.toInt()).array()
-        val cipher = Cipher.getInstance("ChaCha20-Poly1305")
+        val cipher = Cipher.getInstance(CIPHER_NAME)
         cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "ChaCha20"), IvParameterSpec(nonce(origin, sequence)))
         cipher.updateAAD(aad)
         val encrypted = cipher.doFinal(audio)
@@ -95,7 +96,7 @@ internal object Wire {
         val origin = data.copyOfRange(4, 12)
         val sequence = ByteBuffer.wrap(data, 12, 4).order(ByteOrder.BIG_ENDIAN).int.toLong() and 0xffff_ffffL
         return try {
-            val cipher = Cipher.getInstance("ChaCha20-Poly1305")
+            val cipher = Cipher.getInstance(CIPHER_NAME)
             cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "ChaCha20"), IvParameterSpec(nonce(origin, sequence)))
             cipher.updateAAD(data, 0, 16)
             AudioPacket(origin, sequence, ttl, cipher.doFinal(data, HEADER_SIZE, length), data)
@@ -114,7 +115,7 @@ internal object Wire {
         val aad = ByteBuffer.allocate(16).order(ByteOrder.BIG_ENDIAN)
             .put('R'.code.toByte()).put('M'.code.toByte()).put(PROTOCOL_VERSION.toByte()).put(3)
             .put(origin).putInt(sequence.toInt()).array()
-        val cipher = Cipher.getInstance("ChaCha20-Poly1305")
+        val cipher = Cipher.getInstance(CIPHER_NAME)
         cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "ChaCha20"), IvParameterSpec(nonce(origin, sequence)))
         cipher.updateAAD(aad)
         val encrypted = cipher.doFinal(name.toByteArray(Charsets.UTF_8))
@@ -130,7 +131,7 @@ internal object Wire {
         val origin = data.copyOfRange(4, 12)
         val sequence = ByteBuffer.wrap(data, 12, 4).order(ByteOrder.BIG_ENDIAN).int.toLong() and 0xffff_ffffL
         return try {
-            val cipher = Cipher.getInstance("ChaCha20-Poly1305")
+            val cipher = Cipher.getInstance(CIPHER_NAME)
             cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "ChaCha20"), IvParameterSpec(nonce(origin, sequence)))
             cipher.updateAAD(data, 0, 16)
             val bytes = cipher.doFinal(data, HEADER_SIZE, length)

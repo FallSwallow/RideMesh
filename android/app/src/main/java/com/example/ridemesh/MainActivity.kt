@@ -13,6 +13,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.graphics.Bitmap
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -48,7 +49,17 @@ class MainActivity : Activity() {
         fun add(view: android.view.View) {
             column.addView(view, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }
-        add(TextView(this).apply { text = "RideMesh｜離線車隊通話"; textSize = 24f })
+        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        header.addView(TextView(this).apply {
+            text = "RideMesh｜離線車隊通話"
+            textSize = 24f
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        header.addView(Button(this).apply {
+            text = "關於"
+            contentDescription = "關於與連線診斷"
+            setOnClickListener { showAbout() }
+        })
+        add(header)
         add(TextView(this).apply { text = "停車時輸入同一組群組金鑰，確認藍牙安全帽耳機後開始。" })
         groupKey = EditText(this).apply {
             hint = "32 字元群組金鑰"
@@ -115,9 +126,11 @@ class MainActivity : Activity() {
         muteButton = Button(this).apply {
             text = "麥克風靜音"
             setOnClickListener {
-                muted = !muted
-                RideService.current?.setMuted(muted)
-                text = if (muted) "解除靜音" else "麥克風靜音"
+                RideService.current?.let { service ->
+                    service.setMuted(!service.isMuted)
+                    muted = service.isMuted
+                    text = if (muted) "解除靜音" else "麥克風靜音"
+                }
             }
         }
         add(muteButton)
@@ -154,6 +167,33 @@ class MainActivity : Activity() {
         if (Build.VERSION.SDK_INT >= 33) required += Manifest.permission.NEARBY_WIFI_DEVICES
         val missing = required.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isNotEmpty()) requestPermissions(missing.toTypedArray(), 11) else startRide(key, name)
+    }
+
+    private fun showAbout() {
+        val info = packageManager.getPackageInfo(packageName, 0)
+        val service = RideService.current
+        val details = buildString {
+            appendLine("版本：${info.versionName ?: "未知"}（建置 ${info.longVersionCode}）")
+            appendLine("通訊協定：RideMesh v${Wire.PROTOCOL_VERSION}")
+            appendLine("封包加密：${Wire.CIPHER_NAME}（語音與成員名稱）")
+            appendLine("連線驗證：共享群組金鑰與 Nearby 驗證碼")
+            appendLine("連線方式：Nearby Connections，裝置間直接通訊")
+            appendLine()
+            appendLine("目前狀態：${service?.stateText ?: "未通話"}")
+            if (service != null) {
+                appendLine("頻道識別碼：${service.roomId}")
+                appendLine("直接連線鄰居：${service.directPeers}")
+                appendLine("可達頻道成員：${service.members.size}")
+                appendLine("麥克風：${if (service.isMuted) "靜音" else "開啟"}")
+            }
+            appendLine()
+            append("同一頻道的手機需使用 v2 協定；100 公尺與鎖屏重連仍需實機驗證。")
+        }
+        AlertDialog.Builder(this)
+            .setTitle("關於 RideMesh")
+            .setMessage(details)
+            .setPositiveButton("關閉", null)
+            .show()
     }
 
     private fun showKeyQrCode() {
@@ -235,6 +275,9 @@ class MainActivity : Activity() {
 
     private fun updateStatus() {
         val service = RideService.current
+        muted = service?.isMuted ?: false
+        muteButton.isEnabled = service != null
+        muteButton.text = if (muted) "解除靜音" else "麥克風靜音"
         keyChangeControls.forEach { it.isEnabled = service == null }
         userName.isEnabled = service == null
         status.text = if (service == null) "目前未通話" else {
