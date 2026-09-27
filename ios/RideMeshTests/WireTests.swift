@@ -20,5 +20,13 @@ final class WireTests: XCTestCase {
         XCTAssertNil(Wire.decodeAudio(key, data: Data(tampered)))
         XCTAssertTrue(Wire.validProof(Wire.proof(key, code: "1234"), key: key, code: "1234"))
         XCTAssertFalse(Wire.validProof(Wire.proof(key, code: "1234"), key: key, code: "5678"))
+        let presenceKey = Wire.presenceKey(group)
+        let presence = try Wire.encodePresence(presenceKey, origin: origin, sequence: 7,
+                                               ttl: 4, name: "騎士甲")
+        XCTAssertEqual(Wire.decodePresence(presenceKey, data: presence)?.name, "騎士甲")
+        XCTAssertEqual(Wire.decodePresence(presenceKey, data: Wire.lowerTTL(presence))?.ttl, 3)
+        var badPresence = Array(presence)
+        badPresence[25] ^= 1
+        XCTAssertNil(Wire.decodePresence(presenceKey, data: Data(badPresence)))
     }
 }

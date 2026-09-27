@@ -13,9 +13,31 @@ struct ContentView: View {
                     TextField("32 字元群組金鑰", text: $ride.keyText)
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
+                    HStack {
+                        Button("複製") { UIPasteboard.general.string = ride.keyText }
+                            .buttonStyle(.borderless)
+                            .disabled(ride.keyText.isEmpty)
+                        Spacer()
+                        Button("清空") { ride.keyText = "" }
+                            .buttonStyle(.borderless)
+                            .disabled(ride.keyText.isEmpty)
+                    }
                     Button("建立新群組金鑰") { ride.createGroup() }
-                    Button("複製群組金鑰") { UIPasteboard.general.string = ride.keyText }
-                        .disabled(ride.keyText.isEmpty)
+                    TextField("顯示名稱（最多 20 字）", text: $ride.nameText)
+                        .textInputAutocapitalization(.words)
+                        .autocorrectionDisabled()
+                        .disabled(ride.active)
+                }
+                if ride.active {
+                    Section("頻道成員（\(ride.members.count)）") {
+                        ForEach(ride.members) { member in
+                            if member.isSelf {
+                                Text("\(member.name)（我）")
+                            } else {
+                                Text("\(member.name)（\(String(member.id.suffix(4)))）")
+                            }
+                        }
+                    }
                 }
                 Section("通話") {
                     Text(ride.status)

@@ -23,6 +23,11 @@ class WireAndMeshTest {
         assertTrue(Wire.decodeAudio(mediaKey, packet)!!.audio.contentEquals(silence))
         assertEquals(3, Wire.decodeAudio(mediaKey, Wire.withLowerTtl(packet))!!.ttl)
         assertNull(Wire.decodeAudio(mediaKey, packet.copyOf().also { it[25] = (it[25].toInt() xor 1).toByte() }))
+        val presenceKey = Wire.presenceKey(group)
+        val presence = Wire.encodePresence(presenceKey, origin, 7, 4, "騎士甲")
+        assertEquals("騎士甲", Wire.decodePresence(presenceKey, presence)?.name)
+        assertEquals(3, Wire.decodePresence(presenceKey, Wire.withLowerTtl(presence))?.ttl)
+        assertNull(Wire.decodePresence(presenceKey, presence.copyOf().also { it[25] = (it[25].toInt() xor 1).toByte() }))
     }
 
     @Test fun threePhonesRelayPartitionAndRejoin() {
@@ -30,10 +35,11 @@ class WireAndMeshTest {
         val queue = ArrayDeque<Delivery>()
         val heard = mutableListOf<String>()
         val nodes = mutableMapOf<String, MeshRouter>()
+        var now = 0L
         fun node(name: String, index: Byte): MeshRouter = MeshRouter(
-            group, ByteArray(8) { index },
+            group, ByteArray(8) { index }, name,
             { to, bytes -> queue.add(Delivery(name, to, bytes)) },
-            { _, _ -> heard.add(name) }, { _ -> }
+            { _, _ -> heard.add(name) }, { _ -> }, { _ -> }, { now }
         )
         nodes["A"] = node("A", 1)
         nodes["B"] = node("B", 2)
@@ -51,17 +57,30 @@ class WireAndMeshTest {
         }
         link("A", "B", "1234")
         link("B", "C", "5678")
+        nodes.values.forEach(MeshRouter::sendPresence)
+        deliver()
+        assertEquals(setOf("A", "B", "C"), nodes["A"]!!.memberSnapshot().map { it.name }.toSet())
         nodes["A"]!!.sendLocal(silence)
         deliver()
         assertEquals(listOf("B", "C"), heard)
         heard.clear()
         nodes["B"]!!.disconnected("C")
         nodes["C"]!!.disconnected("B")
+        now = 16_000
+        nodes["A"]!!.sendPresence()
+        nodes["B"]!!.sendPresence()
+        deliver()
+        nodes.values.forEach(MeshRouter::expireMembers)
+        assertEquals(setOf("A", "B"), nodes["A"]!!.memberSnapshot().map { it.name }.toSet())
+        assertEquals(listOf("C"), nodes["C"]!!.memberSnapshot().map { it.name })
         nodes["A"]!!.sendLocal(silence)
         deliver()
         assertEquals(listOf("B"), heard)
         heard.clear()
         link("B", "C", "9012")
+        nodes.values.forEach(MeshRouter::sendPresence)
+        deliver()
+        assertEquals(setOf("A", "B", "C"), nodes["C"]!!.memberSnapshot().map { it.name }.toSet())
         nodes["A"]!!.sendLocal(silence)
         deliver()
         assertEquals(listOf("B", "C"), heard)

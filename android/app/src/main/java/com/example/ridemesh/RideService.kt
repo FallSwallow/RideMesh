@@ -7,12 +7,15 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
+import android.os.Handler
+import android.os.Looper
 
 class RideService : Service() {
     companion object {
         const val ACTION_START = "com.example.ridemesh.START"
         const val ACTION_STOP = "com.example.ridemesh.STOP"
         const val EXTRA_KEY = "group_key"
+        const val EXTRA_NAME = "user_name"
         @Volatile var current: RideService? = null
             private set
     }
@@ -23,9 +26,19 @@ class RideService : Service() {
         private set
     @Volatile var roomId = ""
         private set
+    @Volatile var members: List<ChannelMember> = emptyList()
+        private set
     private var router: MeshRouter? = null
     private var nearby: NearbyMesh? = null
     private var audio: AudioEngine? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private val heartbeat = object : Runnable {
+        override fun run() {
+            router?.sendPresence()
+            router?.expireMembers()
+            if (router != null) handler.postDelayed(this, 5_000)
+        }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -47,23 +60,30 @@ class RideService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        val userName = Wire.normalizeName(intent.getStringExtra(EXTRA_NAME).orEmpty()) ?: run {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         startForeground(7, notification())
         try {
             val node = Wire.nodeId()
             val newAudio = AudioEngine(this) { audioBytes -> router?.sendLocal(audioBytes) }
             val newRouter = MeshRouter(
-                groupKey, node,
+                groupKey, node, userName,
                 { endpoint, bytes -> nearby?.send(endpoint, bytes) },
                 { origin, bytes -> newAudio.play(origin, bytes) },
-                { count -> directPeers = count }
+                { count -> directPeers = count },
+                { currentMembers -> members = currentMembers }
             )
             val newNearby = NearbyMesh(this, newRouter) { stateText = it }
             router = newRouter
             audio = newAudio
             nearby = newNearby
             roomId = newRouter.roomId
+            members = newRouter.memberSnapshot()
             newAudio.start()
             newNearby.start()
+            handler.post(heartbeat)
             stateText = "通話中，正在尋找同群手機"
         } catch (e: Exception) {
             stateText = "啟動失敗：${e.localizedMessage}"
@@ -96,12 +116,14 @@ class RideService : Service() {
     }
 
     override fun onDestroy() {
+        handler.removeCallbacks(heartbeat)
         nearby?.stop()
         audio?.stop()
         nearby = null
         audio = null
         router = null
         directPeers = 0
+        members = emptyList()
         stateText = "通話已結束"
         current = null
         super.onDestroy()

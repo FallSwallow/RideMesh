@@ -11,6 +11,14 @@ struct AudioPacket {
     var id: String { origin.hex + ":\(sequence)" }
 }
 
+struct PresencePacket {
+    let origin: Data
+    let sequence: UInt32
+    let ttl: UInt8
+    let name: String
+    var id: String { "P:" + origin.hex + ":\(sequence)" }
+}
+
 enum Wire {
     static let serviceID = "com.example.ridemesh"
     static let maxTTL: UInt8 = 4
@@ -40,6 +48,18 @@ enum Wire {
 
     static func mediaKey(_ groupKey: Data) -> SymmetricKey {
         SymmetricKey(data: Data(SHA256.hash(data: groupKey + Data("RideMesh-media-v1".utf8))))
+    }
+
+    static func presenceKey(_ groupKey: Data) -> SymmetricKey {
+        SymmetricKey(data: Data(SHA256.hash(data: groupKey + Data("RideMesh-presence-v1".utf8))))
+    }
+
+    static func normalizedName(_ input: String) -> String? {
+        let name = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name.unicodeScalars.count <= 20, name.utf8.count <= 64,
+              !name.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
+        else { return nil }
+        return name
     }
 
     static func proof(_ key: SymmetricKey, code: String) -> Data {
@@ -100,6 +120,47 @@ enum Wire {
         var bytes = Array(data)
         bytes[16] -= 1
         return Data(bytes)
+    }
+
+    static func isPresence(_ data: Data) -> Bool {
+        let bytes = Array(data)
+        return bytes.count >= 4 && bytes[0...3].elementsEqual([0x52, 0x4d, 1, 3])
+    }
+
+    static func encodePresence(_ key: SymmetricKey, origin: Data, sequence: UInt32,
+                               ttl: UInt8, name: String) throws -> Data {
+        precondition(origin.count == 8 && ttl <= maxTTL && normalizedName(name) == name)
+        var aad = Data([0x52, 0x4d, 1, 3]) + origin
+        aad.append(contentsOf: sequence.bigEndianBytes)
+        let nonce = try AES.GCM.Nonce(data: origin + Data(sequence.bigEndianBytes))
+        let box = try AES.GCM.seal(Data(name.utf8), using: key, nonce: nonce, authenticating: aad)
+        let ciphertext = box.ciphertext + box.tag
+        var packet = aad
+        packet.append(ttl)
+        packet.append(UInt8((ciphertext.count >> 8) & 0xff))
+        packet.append(UInt8(ciphertext.count & 0xff))
+        packet.append(ciphertext)
+        return packet
+    }
+
+    static func decodePresence(_ key: SymmetricKey, data: Data) -> PresencePacket? {
+        let bytes = Array(data)
+        guard bytes.count >= 36 && bytes.count <= 99, isPresence(data),
+              bytes[16] <= maxTTL,
+              ((Int(bytes[17]) << 8) | Int(bytes[18])) == bytes.count - 19,
+              (17...80).contains(bytes.count - 19) else { return nil }
+        let origin = Data(bytes[4..<12])
+        let sequence = UInt32(bytes[12]) << 24 | UInt32(bytes[13]) << 16 |
+            UInt32(bytes[14]) << 8 | UInt32(bytes[15])
+        do {
+            let nonce = try AES.GCM.Nonce(data: origin + Data(sequence.bigEndianBytes))
+            let box = try AES.GCM.SealedBox(nonce: nonce,
+                                           ciphertext: Data(bytes[19..<(bytes.count - 16)]),
+                                           tag: Data(bytes[(bytes.count - 16)..<bytes.count]))
+            let plaintext = try AES.GCM.open(box, using: key, authenticating: Data(bytes[0..<16]))
+            guard let name = String(data: plaintext, encoding: .utf8), normalizedName(name) == name else { return nil }
+            return PresencePacket(origin: origin, sequence: sequence, ttl: bytes[16], name: name)
+        } catch { return nil }
     }
 }
 
