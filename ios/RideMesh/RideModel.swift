@@ -1,10 +1,11 @@
 import Foundation
 import AVFoundation
 import Combine
+import UIKit
 
 final class RideModel: ObservableObject {
     @Published var keyText = ""
-    @Published var nameText = UserDefaults.standard.string(forKey: "ride_user_name") ?? ""
+    @Published var nameText = ""
     @Published var status = "尚未啟動"
     @Published var roomID = ""
     @Published var directPeers = 0
@@ -15,6 +16,21 @@ final class RideModel: ObservableObject {
     private var nearby: NearbyMesh?
     private var voice: VoiceEngine?
     private var heartbeat: Timer?
+
+    init() {
+        if let saved = UserDefaults.standard.string(forKey: "ride_user_name"), !saved.isEmpty {
+            nameText = saved
+        } else {
+            let device = UIDevice.current
+            let genericNames = [device.model, "iPhone", "iPad", "iPod touch"]
+            let deviceName = genericNames.contains {
+                device.name.localizedCaseInsensitiveCompare($0) == .orderedSame
+            } ? nil : device.name
+            let suggestion = Wire.suggestedName(deviceName, suffix: Int.random(in: 0...9999))
+            nameText = suggestion
+            UserDefaults.standard.set(suggestion, forKey: "ride_user_name")
+        }
+    }
 
     func createGroup() {
         keyText = Wire.randomBytes(16).hex

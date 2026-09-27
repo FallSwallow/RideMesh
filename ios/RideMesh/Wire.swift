@@ -62,6 +62,11 @@ enum Wire {
         return name
     }
 
+    static func suggestedName(_ deviceName: String?, suffix: Int) -> String {
+        precondition((0...9999).contains(suffix))
+        return deviceName.flatMap(normalizedName) ?? String(format: "USER%04d", suffix)
+    }
+
     static func proof(_ key: SymmetricKey, code: String) -> Data {
         let input = Data("RideMesh-link-v1:\(code)".utf8)
         let mac = Data(HMAC<SHA256>.authenticationCode(for: input, using: key))

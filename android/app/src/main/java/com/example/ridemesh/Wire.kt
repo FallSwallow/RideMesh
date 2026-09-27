@@ -54,6 +54,13 @@ internal object Wire {
         return name
     }
 
+    fun suggestedName(deviceName: String?, suffix: Int): String {
+        require(suffix in 0..9999)
+        return deviceName?.let(::normalizeName) ?: "USER${suffix.toString().padStart(4, '0')}"
+    }
+
+    fun randomFourDigits(): Int = random.nextInt(10_000)
+
     fun proof(key: ByteArray, verificationCode: String): ByteArray {
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(SecretKeySpec(key, "HmacSHA256"))

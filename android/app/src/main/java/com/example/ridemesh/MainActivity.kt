@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
@@ -69,7 +70,18 @@ class MainActivity : Activity() {
         userName = EditText(this).apply {
             hint = "你的顯示名稱（最多 20 字）"
             isSingleLine = true
-            setText(savedInstanceState?.getString("name") ?: getPreferences(MODE_PRIVATE).getString("name", ""))
+            val preferences = getPreferences(MODE_PRIVATE)
+            val initialName = savedInstanceState?.getString("name")
+                ?: preferences.getString("name", null)
+                ?: run {
+                    val deviceName = try {
+                        Settings.Global.getString(contentResolver, Settings.Global.DEVICE_NAME)
+                    } catch (_: SecurityException) { null }
+                    Wire.suggestedName(deviceName, Wire.randomFourDigits()).also {
+                        preferences.edit().putString("name", it).apply()
+                    }
+                }
+            setText(initialName)
         }
         add(userName)
         add(Button(this).apply {

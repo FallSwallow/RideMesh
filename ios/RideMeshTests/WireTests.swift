@@ -3,6 +3,13 @@ import CryptoKit
 @testable import RideMesh
 
 final class WireTests: XCTestCase {
+    func testSuggestedNameUsesDeviceOrFourDigitFallback() {
+        XCTAssertEqual(Wire.suggestedName(" 騎士手機 ", suffix: 42), "騎士手機")
+        XCTAssertEqual(Wire.suggestedName(nil, suffix: 42), "USER0042")
+        XCTAssertEqual(Wire.suggestedName(" ", suffix: 0), "USER0000")
+        XCTAssertEqual(Wire.suggestedName(String(repeating: "a", count: 21), suffix: 9999), "USER9999")
+    }
+
     func testAndroidCompatiblePacketAndAuthentication() throws {
         let group = Data((0..<16).map { UInt8($0) })
         let key = Wire.mediaKey(group)

@@ -10,6 +10,13 @@ class WireAndMeshTest {
     private val group = ByteArray(16) { it.toByte() }
     private val silence = ByteArray(160) { 0xff.toByte() }
 
+    @Test fun suggestedNameUsesDeviceOrFourDigitFallback() {
+        assertEquals("騎士手機", Wire.suggestedName(" 騎士手機 ", 42))
+        assertEquals("USER0042", Wire.suggestedName(null, 42))
+        assertEquals("USER0000", Wire.suggestedName("  ", 0))
+        assertEquals("USER9999", Wire.suggestedName("a".repeat(21), 9999))
+    }
+
     @Test fun crossPlatformPacketVectorAndTamperRejection() {
         val origin = byteArrayOf(0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88.toByte())
         val mediaKey = Wire.mediaKey(group)
