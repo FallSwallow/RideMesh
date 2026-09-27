@@ -1,0 +1,41 @@
+name: RideMesh
+options:
+  bundleIdPrefix: com.example
+packages:
+  NearbyConnections:
+    url: https://github.com/google/nearby.git
+    branch: main
+targets:
+  RideMesh:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: RideMesh
+        excludes:
+          - Info.plist
+          - RideMesh.entitlements
+    dependencies:
+      - package: NearbyConnections
+        product: NearbyConnections
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.ridemesh
+        SWIFT_VERSION: 5.9
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_FILE: RideMesh/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: RideMesh/RideMesh.entitlements
+  RideMeshTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - RideMeshTests
+    dependencies:
+      - target: RideMesh
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.ridemesh.tests
+        SWIFT_VERSION: 5.9
+        GENERATE_INFOPLIST_FILE: YES

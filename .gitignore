@@ -1,0 +1,10 @@
+.gradle/
+.kotlin/
+build/
+local.properties
+*.iml
+.idea/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.DS_Store
