@@ -7,9 +7,10 @@
     <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
     <key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>0.4</string>
-    <key>CFBundleVersion</key><string>4</string>
+    <key>CFBundleShortVersionString</key><string>0.5</string>
+    <key>CFBundleVersion</key><string>5</string>
     <key>LSRequiresIPhoneOS</key><true/>
+    <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string></array>
     <key>UILaunchScreen</key><dict/>
     <key>NSMicrophoneUsageDescription</key><string>將安全帽耳機麥克風的語音傳給附近的車隊成員。</string>
     <key>NSCameraUsageDescription</key><string>掃描其他騎士顯示的群組金鑰 QR Code。</string>

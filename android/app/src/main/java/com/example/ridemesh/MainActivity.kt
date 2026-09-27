@@ -189,6 +189,7 @@ class MainActivity : Activity() {
         val scanner = IntentIntegrator(this)
             .setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
             .setPrompt("掃描其他騎士顯示的群組金鑰")
+            .setOrientationLocked(true)
             .setBeepEnabled(false)
         startActivityForResult(scanner.createScanIntent(), QR_SCAN_REQUEST)
     }

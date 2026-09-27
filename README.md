@@ -8,7 +8,7 @@
 - [原始碼壓縮包](artifacts/RideMesh-prototype.zip)
 - [機車車隊離線語音對講 App 企畫書](docs/機車車隊離線語音對講App企畫書.md)
 
-Android 0.4 APK SHA-256：`79A8517C7E4501AA8A8B7A9F2EEDD4EF4B65CF8DF07ABCE15A37ED327F8B9EF8`。
+Android 0.5 APK SHA-256：`345C673489FD5DB3936F7BC70C3FA1B9C404E22F0CFA9FF200D2F3A945A9C45B`。
 
 ## 原型已實作的範圍
 
@@ -19,7 +19,7 @@ Android 0.4 APK SHA-256：`79A8517C7E4501AA8A8B7A9F2EEDD4EF4B65CF8DF07ABCE15A37E
 - Android 使用麥克風前景服務；iOS 使用 `playAndRecord`、`voiceChat` 與背景音訊模式。
 - 音訊先採用 8 kHz、20 ms、G.711 μ-law，以維持跨平台原型無額外音訊編碼相依。正式版仍須依企畫書改測 Opus、音質與耗電。
 - 金鑰欄位下方提供「複製」與「清空」；顯示名稱首次使用時預設為裝置名稱，無法取得可用名稱時預設為 `USER` 加四位數亂碼。仍可在加入前修改名稱，連線後顯示本機及經轉送仍可通訊的頻道成員。
-- 建立金鑰後可顯示 QR Code，其他手機在 App 內掃描後會自動填入金鑰；產生與掃描都在本機完成，掃描時需允許相機權限。
+- 建立金鑰後可顯示 QR Code，其他手機在 App 內掃描後會自動填入金鑰；產生與掃描都在本機完成，掃描時需允許相機權限。Android 掃描畫面固定直向；iOS 介面設定為直向，掃描時不隨手機傾斜轉成橫向。
 
 ## 專案開啟
 
@@ -60,7 +60,7 @@ Android 0.4 APK SHA-256：`79A8517C7E4501AA8A8B7A9F2EEDD4EF4B65CF8DF07ABCE15A37E
 - 執行三節點模擬：A↔B↔C 語音轉送、B↔C 斷線時 A↔B 保持通話、重連後恢復跨段通話：通過。
 - 固定 AES-GCM 測試封包的 SHA-256：Kotlin 與獨立 Node.js 加密實作均為 `27EB906E0B6203FED9EF4B9C4CB25FDE6012167F3FCDB6A699FD15D95645513E`。
 - Android Manifest、iOS Info.plist 與 Entitlements：XML 格式解析通過。
-- Android `assembleDebug`：**成功**，產出 0.4 版 debug APK；`testDebugUnitTest`：4 個測試通過，0 失敗，涵蓋加密名稱封包、三機成員轉送、分段逾時與重連，以及 QR 金鑰編碼／讀取。
+- Android `assembleDebug`：**成功**，產出 0.5 版 debug APK；`testDebugUnitTest`：4 個測試通過，0 失敗，涵蓋加密名稱封包、三機成員轉送、分段逾時與重連，以及 QR 金鑰編碼／讀取。
 - Android APK 簽章驗證：v2 簽章有效；最低 Android API 31。APK 未宣告 `INTERNET` 權限。
 - iOS Xcode 建置、實機安裝、跨平台連線、鎖屏及騎乘實測：**尚未執行**，需在具 Xcode 與實機的環境完成。
 
