@@ -10,6 +10,8 @@ Nearby 服務 ID 固定為 `com.example.ridemesh`。每支手機的廣告資訊�
 
 使用者輸入 16 位元組隨機群組金鑰，以 32 字元大寫十六進位呈現。`roomId = first4bytes(SHA256(groupKey))`。`mediaKey = SHA256(groupKey || UTF8("RideMesh-media-v1"))`。Nearby 完成連線協商後，兩端取得相同的四位數驗證碼，計算 `HMAC-SHA256(mediaKey, UTF8("RideMesh-link-v1:" || verificationCode))`。驗證封包格式是 `RM`、版本 `01`、型別 `01`、32 位元組 HMAC。只在收到正確驗證封包後把鄰居列為已授權；未授權的連線不能收發語音。應在配對／重連時使用新的 Nearby 驗證碼。
 
+QR Code 的內容是上述 32 字元大寫十六進位群組金鑰，不含網址或其他欄位。掃描後先驗證格式，只有合法的 16 位元組金鑰才會取代輸入欄位；掃描本身不會自動開始通話。QR Code 產生與辨識皆在裝置本機完成。
+
 ## 語音封包
 
 | 位移 | 長度 | 欄位 |

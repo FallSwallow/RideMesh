@@ -2,6 +2,7 @@ package com.example.ridemesh
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
@@ -11,20 +12,29 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.graphics.Bitmap
+import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.client.android.Intents
+import com.google.zxing.integration.android.IntentIntegrator
+import com.journeyapps.barcodescanner.BarcodeEncoder
 
 class MainActivity : Activity() {
+    private companion object { const val QR_SCAN_REQUEST = 42 }
     private val ui = Handler(Looper.getMainLooper())
     private lateinit var groupKey: EditText
     private lateinit var userName: EditText
     private lateinit var status: TextView
     private lateinit var muteButton: Button
+    private val keyChangeControls = mutableListOf<View>()
     private var pendingKey: String? = null
     private var pendingName: String? = null
     private var muted = false
@@ -46,6 +56,7 @@ class MainActivity : Activity() {
             setText(savedInstanceState?.getString("key").orEmpty())
         }
         add(groupKey)
+        keyChangeControls.add(groupKey)
         val keyActions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         keyActions.addView(Button(this).apply {
             text = "複製"
@@ -61,12 +72,25 @@ class MainActivity : Activity() {
         keyActions.addView(Button(this).apply {
             text = "清空"
             setOnClickListener { groupKey.text.clear() }
+            keyChangeControls.add(this)
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         add(keyActions)
         add(Button(this).apply {
             text = "建立新群組金鑰"
             setOnClickListener { groupKey.setText(Wire.randomBytes(16).toHex()) }
+            keyChangeControls.add(this)
         })
+        val qrActions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        qrActions.addView(Button(this).apply {
+            text = "顯示 QR Code"
+            setOnClickListener { showKeyQrCode() }
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        qrActions.addView(Button(this).apply {
+            text = "掃描 QR Code"
+            setOnClickListener { scanKeyQrCode() }
+            keyChangeControls.add(this)
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        add(qrActions)
         userName = EditText(this).apply {
             hint = "你的顯示名稱（最多 20 字）"
             isSingleLine = true
@@ -132,6 +156,63 @@ class MainActivity : Activity() {
         if (missing.isNotEmpty()) requestPermissions(missing.toTypedArray(), 11) else startRide(key, name)
     }
 
+    private fun showKeyQrCode() {
+        val key = Wire.parseKey(groupKey.text.toString())?.toHex()
+        if (key == null) {
+            Toast.makeText(this, "請先建立或輸入有效的群組金鑰", Toast.LENGTH_LONG).show()
+            return
+        }
+        try {
+            val bitmap: Bitmap = BarcodeEncoder().encodeBitmap(key, BarcodeFormat.QR_CODE, 800, 800)
+            val size = (280 * resources.displayMetrics.density).toInt()
+            val image = ImageView(this).apply {
+                setImageBitmap(bitmap)
+                layoutParams = LinearLayout.LayoutParams(size, size)
+                contentDescription = "群組金鑰 QR Code"
+            }
+            AlertDialog.Builder(this)
+                .setTitle("群組金鑰 QR Code")
+                .setMessage("請讓其他騎士掃描。持有此碼的人可加入頻道。")
+                .setView(image)
+                .setPositiveButton("關閉", null)
+                .show()
+        } catch (_: Exception) {
+            Toast.makeText(this, "無法產生 QR Code", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun scanKeyQrCode() {
+        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)) {
+            Toast.makeText(this, "此裝置沒有可用的相機", Toast.LENGTH_LONG).show()
+            return
+        }
+        val scanner = IntentIntegrator(this)
+            .setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
+            .setPrompt("掃描其他騎士顯示的群組金鑰")
+            .setBeepEnabled(false)
+        startActivityForResult(scanner.createScanIntent(), QR_SCAN_REQUEST)
+    }
+
+    @Deprecated("Android activity result callback for the embedded QR scanner")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != QR_SCAN_REQUEST) return
+        if (resultCode != RESULT_OK || data == null) {
+            if (data?.getBooleanExtra(Intents.Scan.MISSING_CAMERA_PERMISSION, false) == true) {
+                Toast.makeText(this, "請允許相機權限以掃描 QR Code", Toast.LENGTH_LONG).show()
+            }
+            return
+        }
+        val scanned = IntentIntegrator.parseActivityResult(resultCode, data).contents
+        val key = scanned?.let(Wire::parseKey)
+        if (key == null) {
+            Toast.makeText(this, "QR Code 不是有效的群組金鑰", Toast.LENGTH_LONG).show()
+        } else {
+            groupKey.setText(key.toHex())
+            Toast.makeText(this, "已填入群組金鑰", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode != 11) return
@@ -153,6 +234,7 @@ class MainActivity : Activity() {
 
     private fun updateStatus() {
         val service = RideService.current
+        keyChangeControls.forEach { it.isEnabled = service == null }
         userName.isEnabled = service == null
         status.text = if (service == null) "目前未通話" else {
             val members = service.members

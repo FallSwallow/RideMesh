@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.ridemesh"
         minSdk = 31
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3"
+        versionCode = 4
+        versionName = "0.4"
     }
 
     compileOptions {
@@ -29,5 +29,6 @@ kotlin {
 
 dependencies {
     implementation("com.google.android.gms:play-services-nearby:19.5.0")
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     testImplementation("junit:junit:4.13.2")
 }

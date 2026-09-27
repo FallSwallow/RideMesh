@@ -4,6 +4,12 @@ import UIKit
 struct ContentView: View {
     @EnvironmentObject private var ride: RideModel
     @Environment(\.scenePhase) private var scenePhase
+    @State private var showQRCode = false
+    @State private var showScanner = false
+    @State private var qrKey = ""
+    @State private var qrNotice = ""
+    @State private var scanNotice: String?
+    @State private var showQrNotice = false
 
     var body: some View {
         NavigationStack {
@@ -13,6 +19,7 @@ struct ContentView: View {
                     TextField("32 字元群組金鑰", text: $ride.keyText)
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
+                        .disabled(ride.active)
                     HStack {
                         Button("複製") { UIPasteboard.general.string = ride.keyText }
                             .buttonStyle(.borderless)
@@ -20,9 +27,29 @@ struct ContentView: View {
                         Spacer()
                         Button("清空") { ride.keyText = "" }
                             .buttonStyle(.borderless)
-                            .disabled(ride.keyText.isEmpty)
+                            .disabled(ride.active || ride.keyText.isEmpty)
                     }
                     Button("建立新群組金鑰") { ride.createGroup() }
+                        .disabled(ride.active)
+                    HStack {
+                        Button("顯示 QR Code") {
+                            guard let key = Wire.parseKey(ride.keyText) else {
+                                qrNotice = "請先建立或輸入有效的群組金鑰"
+                                showQrNotice = true
+                                return
+                            }
+                            qrKey = key.hex
+                            showQRCode = true
+                        }
+                        .buttonStyle(.borderless)
+                        Spacer()
+                        Button("掃描 QR Code") {
+                            scanNotice = nil
+                            showScanner = true
+                        }
+                            .buttonStyle(.borderless)
+                            .disabled(ride.active)
+                    }
                     TextField("顯示名稱（最多 20 字）", text: $ride.nameText)
                         .textInputAutocapitalization(.words)
                         .autocorrectionDisabled()
@@ -61,6 +88,41 @@ struct ContentView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { ride.resumeIfNeeded() }
+        }
+        .sheet(isPresented: $showQRCode) {
+            NavigationStack {
+                GroupKeyQRCodeView(key: qrKey)
+                    .navigationTitle("群組金鑰 QR Code")
+                    .toolbar { Button("完成") { showQRCode = false } }
+            }
+        }
+        .sheet(isPresented: $showScanner, onDismiss: {
+            if let message = scanNotice {
+                scanNotice = nil
+                qrNotice = message
+                showQrNotice = true
+            }
+        }) {
+            NavigationStack {
+                GroupKeyScannerView(onScan: { value in
+                    showScanner = false
+                    if let key = Wire.parseKey(value) {
+                        ride.keyText = key.hex
+                    } else {
+                        scanNotice = "QR Code 不是有效的群組金鑰"
+                    }
+                }, onError: { message in
+                    showScanner = false
+                    scanNotice = message
+                })
+                .navigationTitle("掃描群組金鑰")
+                .toolbar { Button("取消") { showScanner = false } }
+            }
+        }
+        .alert("QR Code", isPresented: $showQrNotice) {
+            Button("好", role: .cancel) { }
+        } message: {
+            Text(qrNotice)
         }
     }
 }

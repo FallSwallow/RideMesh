@@ -1,5 +1,11 @@
 package com.example.ridemesh
 
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.BinaryBitmap
+import com.google.zxing.MultiFormatReader
+import com.google.zxing.RGBLuminanceSource
+import com.google.zxing.common.HybridBinarizer
+import com.google.zxing.qrcode.QRCodeWriter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -9,6 +15,19 @@ import java.security.MessageDigest
 class WireAndMeshTest {
     private val group = ByteArray(16) { it.toByte() }
     private val silence = ByteArray(160) { 0xff.toByte() }
+
+    @Test fun groupKeyQrRoundTrip() {
+        val payload = group.toHex()
+        val size = 256
+        val matrix = QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, size, size)
+        val pixels = IntArray(size * size) { index ->
+            if (matrix[index % size, index / size]) 0xff000000.toInt() else 0xffffffff.toInt()
+        }
+        val image = BinaryBitmap(HybridBinarizer(RGBLuminanceSource(size, size, pixels)))
+        val decoded = MultiFormatReader().decode(image).text
+        assertEquals(payload, decoded)
+        assertTrue(Wire.parseKey(decoded)!!.contentEquals(group))
+    }
 
     @Test fun suggestedNameUsesDeviceOrFourDigitFallback() {
         assertEquals("騎士手機", Wire.suggestedName(" 騎士手機 ", 42))
