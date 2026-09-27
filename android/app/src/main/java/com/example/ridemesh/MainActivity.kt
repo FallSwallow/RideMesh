@@ -3,8 +3,6 @@ package com.example.ridemesh
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -31,7 +29,7 @@ import com.journeyapps.barcodescanner.BarcodeEncoder
 class MainActivity : Activity() {
     private companion object { const val QR_SCAN_REQUEST = 42 }
     private val ui = Handler(Looper.getMainLooper())
-    private lateinit var groupKey: EditText
+    private lateinit var groupKey: TextView
     private lateinit var userName: EditText
     private lateinit var status: TextView
     private lateinit var muteButton: Button
@@ -56,36 +54,18 @@ class MainActivity : Activity() {
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         header.addView(Button(this).apply {
             text = "關於"
-            contentDescription = "關於與連線診斷"
+            contentDescription = "關於 RideMesh"
             setOnClickListener { showAbout() }
         })
         add(header)
         add(TextView(this).apply { text = "停車時輸入同一組群組金鑰，確認藍牙安全帽耳機後開始。" })
-        groupKey = EditText(this).apply {
-            hint = "32 字元群組金鑰"
-            isSingleLine = true
+        add(TextView(this).apply { text = "群組金鑰" })
+        groupKey = TextView(this).apply {
+            hint = "尚未建立或掃描群組金鑰"
+            textSize = 18f
             setText(savedInstanceState?.getString("key").orEmpty())
         }
         add(groupKey)
-        keyChangeControls.add(groupKey)
-        val keyActions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        keyActions.addView(Button(this).apply {
-            text = "複製"
-            setOnClickListener {
-                val key = groupKey.text.toString()
-                if (key.isNotBlank()) {
-                    getSystemService(ClipboardManager::class.java)
-                        .setPrimaryClip(ClipData.newPlainText("RideMesh 群組金鑰", key))
-                    Toast.makeText(this@MainActivity, "已複製群組金鑰", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        keyActions.addView(Button(this).apply {
-            text = "清空"
-            setOnClickListener { groupKey.text.clear() }
-            keyChangeControls.add(this)
-        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        add(keyActions)
         add(Button(this).apply {
             text = "建立新群組金鑰"
             setOnClickListener { groupKey.setText(Wire.randomBytes(16).toHex()) }
@@ -171,27 +151,9 @@ class MainActivity : Activity() {
 
     private fun showAbout() {
         val info = packageManager.getPackageInfo(packageName, 0)
-        val service = RideService.current
-        val details = buildString {
-            appendLine("版本：${info.versionName ?: "未知"}（建置 ${info.longVersionCode}）")
-            appendLine("通訊協定：RideMesh v${Wire.PROTOCOL_VERSION}")
-            appendLine("封包加密：${Wire.CIPHER_NAME}（語音與成員名稱）")
-            appendLine("連線驗證：共享群組金鑰與 Nearby 驗證碼")
-            appendLine("連線方式：Nearby Connections，裝置間直接通訊")
-            appendLine()
-            appendLine("目前狀態：${service?.stateText ?: "未通話"}")
-            if (service != null) {
-                appendLine("頻道識別碼：${service.roomId}")
-                appendLine("直接連線鄰居：${service.directPeers}")
-                appendLine("可達頻道成員：${service.members.size}")
-                appendLine("麥克風：${if (service.isMuted) "靜音" else "開啟"}")
-            }
-            appendLine()
-            append("同一頻道的手機需使用 v2 協定；100 公尺與鎖屏重連仍需實機驗證。")
-        }
         AlertDialog.Builder(this)
             .setTitle("關於 RideMesh")
-            .setMessage(details)
+            .setMessage("版本：${info.versionName ?: "未知"}\n封包加密：${Wire.CIPHER_NAME}")
             .setPositiveButton("關閉", null)
             .show()
     }

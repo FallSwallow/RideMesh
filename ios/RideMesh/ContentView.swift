@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 struct ContentView: View {
     @EnvironmentObject private var ride: RideModel
@@ -17,18 +16,10 @@ struct ContentView: View {
             Form {
                 Section("出發前") {
                     Text("先將安全帽耳機與這支手機配對。所有騎士使用同一組群組金鑰。")
-                    TextField("32 字元群組金鑰", text: $ride.keyText)
-                        .textInputAutocapitalization(.characters)
-                        .autocorrectionDisabled()
-                        .disabled(ride.active)
-                    HStack {
-                        Button("複製") { UIPasteboard.general.string = ride.keyText }
-                            .buttonStyle(.borderless)
-                            .disabled(ride.keyText.isEmpty)
-                        Spacer()
-                        Button("清空") { ride.keyText = "" }
-                            .buttonStyle(.borderless)
-                            .disabled(ride.active || ride.keyText.isEmpty)
+                    LabeledContent("群組金鑰") {
+                        Text(ride.keyText.isEmpty ? "尚未建立或掃描" : ride.keyText)
+                            .font(.system(.body, design: .monospaced))
+                            .multilineTextAlignment(.trailing)
                     }
                     Button("建立新群組金鑰") { ride.createGroup() }
                         .disabled(ride.active)
@@ -89,7 +80,7 @@ struct ContentView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showAbout = true } label: { Image(systemName: "info.circle") }
-                        .accessibilityLabel("關於與連線診斷")
+                        .accessibilityLabel("關於 RideMesh")
                 }
             }
         }
@@ -105,7 +96,6 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showAbout) {
             RideMeshAboutView()
-                .environmentObject(ride)
         }
         .sheet(isPresented: $showScanner, onDismiss: {
             if let message = scanNotice {
@@ -139,38 +129,18 @@ struct ContentView: View {
 }
 
 private struct RideMeshAboutView: View {
-    @EnvironmentObject private var ride: RideModel
     @Environment(\.dismiss) private var dismiss
 
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "未知"
     }
 
-    private var build: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "未知"
-    }
-
     var body: some View {
         NavigationStack {
             Form {
-                Section("軟體與安全") {
-                    LabeledContent("版本", value: "\(version)（建置 \(build)）")
-                    LabeledContent("通訊協定", value: "RideMesh v\(Wire.protocolVersion)")
+                Section {
+                    LabeledContent("版本", value: version)
                     LabeledContent("封包加密", value: Wire.cipherName)
-                    Text("語音與成員名稱皆加密；連線使用共享群組金鑰與 Nearby 驗證碼確認。")
-                }
-                Section("連線診斷") {
-                    LabeledContent("目前狀態", value: ride.active ? ride.status : "未通話")
-                    if ride.active {
-                        LabeledContent("頻道識別碼", value: ride.roomID)
-                        LabeledContent("直接連線鄰居", value: "\(ride.directPeers)")
-                        LabeledContent("可達頻道成員", value: "\(ride.members.count)")
-                        LabeledContent("麥克風", value: ride.muted ? "靜音" : "開啟")
-                    }
-                }
-                Section("連線方式") {
-                    Text("使用 Nearby Connections 讓附近裝置直接通訊，不需另架伺服器。")
-                    Text("同一頻道的手機需使用 v2 協定；100 公尺與鎖屏重連仍需實機驗證。")
                 }
             }
             .navigationTitle("關於 RideMesh")
